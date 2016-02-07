@@ -1,0 +1,54 @@
+---
+title: "About me and my interests"
+output: pdf_document
+---
+
+Strengths
+
+* Worked in web development 
+    + Backend
+        1. Ruby on Rails
+        1. Node
+        1. Sinatra
+    + Frontend
+        1. HTML5
+        1. erb
+        1. jQuery/jQueryUI
+        1. CSS/SASS
+    + Data storage
+        1. Postgres
+        1. T-SQL
+        1. Redis
+      
+* Adept at a few languages: 
+    1. Ruby
+    1. Javascript/Coffeescript 
+    1. Python
+    1. Lua
+    1. R
+    1. ASP
+    1. C/C++
+  
+* Basic Linux Skills
+    1. git
+    1. bash
+    
+  
+Weaknesses
+
+* Sprint worker (tend to focus on singular tasks)
+* Relatively little Mac/Windows experience
+* Little experience with network architecture
+* Little experience with hardware support
+
+
+Interests
+
+My biggest current interest (besides becoming an R guru of course) is to learn more about graph animations and possibly develop/contribute to a library. The inspiration for this has been a guy named [Holzman](https://github.com/StephenHolzman):
+
+* [USA Age Distribution](http://imgur.com/a/HQtNf)
+* [USA vs Japan Age-Specific Fertility Rates](http://imgur.com/jtcuSnl)
+* [USA Seasonally Adjusted Unemployment by State](http://imgur.com/a/anwFb)
+ 
+He accomplished these by creating a series of PNGs and using an external program to turn them into a GIF (which is limiting when trying to do something like include the animation in a markdown file). Some packages do exist to help animate but their documentation is lacking, their interface is finnicky at best, and they often require a lot of dependencies.
+
