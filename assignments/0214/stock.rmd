@@ -1,0 +1,115 @@
+---
+author: "Carlos Arias"
+output: pdf_document
+---
+
+
+```{r}
+
+library(data.table,quietly=T)
+library(bizdays,quietly=T)
+library(tables,quietly=T)
+library(knitr,quietly=T)
+
+
+setwd('~/spring2016/viz/vizrepo/assignments/0214/data/')
+
+# getting the data
+apple <- fread('APPLE.csv') 
+boa <- fread('BOA.csv') 
+walmart <- fread('WALMART.csv') 
+ge <- fread('GE.csv') 
+exxon <- fread('EXXON.csv') 
+market <- fread('NYSE(composite).csv')
+
+# market Volume is huge- coerced to int64 and makes binding problematic
+#  am removing that column before binding
+apple[, Volume := NULL]
+boa[, Volume := NULL]
+walmart[, Volume := NULL]
+ge[, Volume := NULL]
+exxon[, Volume := NULL]
+market[, Volume := NULL]
+
+apple[, company := 'apple']
+boa[, company := 'boa']
+walmart[, company := 'walmart']
+ge[, company := 'ge']
+exxon[, company := 'exxon']
+market[, company := 'market']
+
+all.data <- rbind(apple, boa, walmart, ge, exxon, market)
+all.data <- all.data[, c('Open', 'High', 'Low', 'Close') := NULL]
+names(all.data)[2] <- 'adj_close' 
+all.data <- all.data[, Date := as.Date(Date) ]
+all.data <- all.data[ Date >= as.Date('2010-01-29'), ]
+
+
+# getting important dates
+#  since we are talking about years since 1/29/10
+#  each "adjusted year" begins and ends on the next business day
+
+years <- 2010:2016
+dates <- ISOdate(years, 1, 29)
+cal <- Calendar(weekdays=c('sunday', 'saturday'))
+dates <- adjust.next(dates, cal)
+
+# setting year values (is from 1-29 instead of 1-1)
+map <- as.data.table(dates)
+map[, year := year(dates)]
+all.data$year <- map$year[findInterval(x = all.data$Date, vec = map$dates)]
+
+# add current day to important dates so we get 2016 so far
+dates <- c(dates, all.data$Date[1])
+
+# getting changes by adj_year
+year.data <- all.data[ Date %in% dates, ]
+year.data[, change := 100 * adj_close / shift(adj_close, type = 'lead') - 100 ]
+
+# adjusting year value since date marks when change happens
+year.data[Date != last(dates), year := as.integer(year) - 1]
+
+# removing oldest year as it has meaningless change
+year.data <- year.data[Date != dates[1] , ]
+
+# getting relative to market changes
+market.year.data <- year.data[company == 'market',]
+year.data[, rel_change := ((change / 100 + 1) / (market.year.data$change / 100 + 1)) * 100 - 100, by = company]
+
+# historical volatility: sd of daily prices
+all.data[, volatility := sd(adj_close), by = list(company, year)]
+total_volatilities <- all.data[, sd(adj_close), by = list(company)]
+volat <- all.data
+volat[, c('Date', 'adj_close') := NULL ]
+volat <- unique(volat)
+
+# merging tables
+setkey(year.data, company, year)
+setkey(volat, company, year)
+final.data <- year.data[volat, ]
+final.data[, c('Date', 'adj_close') := NULL ]
+
+
+```
+
+
+```{r}
+
+setwd("~/spring2016/viz/vizrepo/assignments/0214/data/")
+final_table <- read.csv("final_table.csv")
+
+kable(final_table, 
+      caption="Annual Return is computed by the change in value from the beginning of year to end. Relative Return is computed by dividing the Annual Return by the market return. Historical Volatility is computed by taking the standard deviation for the given period of time.",
+      col.names = c("Company", " ", "2010","2011","2012",	"2013", "2014","2015","2016","Total"), 
+      padding=2, 
+      escape = TRUE, 
+      format.args = list(na.encode=FALSE,
+                        n.rgroup=c(3,3,3,3,3,3,1),
+                        n.cgroup = c(2,7))
+)
+
+
+latex(final_table,center='centering',numeric.dollar=FALSE,colheads=c("Company", " ", "2010","2011","2012",	"2013", "2014", "2015","2016","Total"),n.rgroup=c(3,3,3,3,3,3,1),n.cgroup = c(2,7))
+
+```
+
