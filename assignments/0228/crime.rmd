@@ -1,0 +1,230 @@
+---
+title: "Crime in Raleigh and San Francisco"
+output: pdf_document
+author: Carlos Arias
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+In this report we looked into crime data from San Francisco, CA and Raleigh, NC. We focused on homocide and auto theft rates from 2005 til today.
+
+We found that crime tended to be frequent in areas with dense population. This trend was more pronounced for murder rates than auto theft. We also found distinct peaks of murder in San Francisco and auto theft in Raleigh. The most intriguing finding was the decrease in homocide rates in Raleigh in the past couple years.
+
+
+Data came from these sites: 
+
+Raleigh: https://data.raleighnc.gov/Police/Police-Incident-Data-from-Jan-1-2005-Master-File/csw9-dd5k
+
+San Francisco: https://data.sfgov.org/Public-Safety/Map-Crime-Incidents-from-1-Jan-2003/gxxq-x39z
+
+
+
+```{r include=FALSE}
+
+# Loading Data and Libraries
+
+library(data.table)
+library(ggmap)
+library(gridExtra)
+
+setwd('~/spring2016/viz/vizrepo/assignments/0228/data/')
+raleigh <- fread('Police_Incident_Data_from_Jan_1_2005_-_Master_File.csv')
+franc <- fread('Map__Crime_Incidents_-_from_1_Jan_2003.csv')
+  
+```
+
+
+Crime descriptors were manually coded as relating to homocide or auto theft. Data for Raleigh was only available since 2005 so San Francisco data was culled accordingly.
+
+
+```{r include=FALSE}
+
+# Cleaning San Francisco Data
+
+gta.fran <- data.table(franc[Category == "VEHICLE THEFT", list(Location, Date)])
+
+mur.fran.categories <- c("ATTEMPTED HOMICIDE BY SNIPING",
+  "ATTEMPTED HOMICIDE WITH A DANGEROUS WEAPON",
+  "ATTEMPTED HOMICIDE WITH A GUN",
+  "ATTEMPTED HOMICIDE WITH A KNIFE",
+  "ATTEMPTED HOMICIDE WITH BODILY FORCE",
+  "ATTEMPTED HOMICIDE WITH EXPLOSIVES")
+mur.fran <- data.table(franc[Descript %in% mur.fran.categories, list(Location, Date)])
+
+gta.fran[, c("lat", "long") := tstrsplit(Location, ", ")]
+mur.fran[, c("lat", "long") := tstrsplit(Location, ", ")]
+
+gta.fran[, lat := as.numeric(substring(lat, 2))]
+mur.fran[, lat := as.numeric(substring(lat, 2))]
+gta.fran[, long := as.numeric(substring(long, 1, nchar(long)-1))]
+mur.fran[, long := as.numeric(substring(long, 1, nchar(long)-1))]
+
+gta.fran[, date := as.Date(Date, '%m/%d/%Y')]
+mur.fran[, date := as.Date(Date, '%m/%d/%Y')]
+
+gta.fran[, Location := NULL]
+mur.fran[, Location := NULL]
+gta.fran[, Date := NULL]
+mur.fran[, Date := NULL]
+
+```
+
+
+
+```{r include=FALSE}
+
+# Cleaning Raleigh Data
+
+gta.ral.categories <- c("Motor Vehicle Theft",
+  "MV THEFT/AUTOMOBILE",                                  
+  "MV THEFT/OTHER VEHICLES",                              
+  "MV THEFT/TRUCK OR BUS" )
+
+gta.ral <- data.table(raleigh[`LCR DESC` %in% gta.ral.categories, list(LOCATION, `INC DATETIME`)])
+
+mur.ral.categories <- c("MURDER AND NONNEGLIGENT MANSLAUGHTER", "MURDER/MANSLAUGHTER BY NEGLIGENCE")
+
+mur.ral <- data.table(raleigh[`LCR DESC` %in% mur.ral.categories, list(LOCATION, `INC DATETIME`)])
+
+
+gta.ral[, c("lat", "long") := tstrsplit(LOCATION, ", ")]
+mur.ral[, c("lat", "long") := tstrsplit(LOCATION, ", ")]
+
+gta.ral[, lat := as.numeric(substring(lat, 2))]
+mur.ral[, lat := as.numeric(substring(lat, 2))]
+gta.ral[, long := as.numeric(substring(long, 1, nchar(long)-1))]
+mur.ral[, long := as.numeric(substring(long, 1, nchar(long)-1))]
+
+gta.ral[, date := as.Date(`INC DATETIME`, '%m/%d/%Y')]
+mur.ral[, date := as.Date(`INC DATETIME`, '%m/%d/%Y')]
+
+gta.ral[, `INC DATETIME` := NULL]
+mur.ral[, `INC DATETIME` := NULL]
+gta.ral[, LOCATION := NULL]
+mur.ral[, LOCATION := NULL]
+
+```
+
+
+```{r include=FALSE}
+
+# Matching date ranges
+
+latest.date.in.category <- min(mur.ral[, date])
+
+gta.ral <- gta.ral[date >= latest.date.in.category]
+gta.fran <- gta.fran[date >= latest.date.in.category]
+mur.fran <- mur.fran[date >= latest.date.in.category]
+
+
+```
+
+
+Density of crime clearly follows a pattern that is likely based on population density. Future endeavors, with cross referenced data, could attempt to show similar densities when controlling for population. The difference between homocide and auto theft could be due to a myriad of reasons but our intuition is that homocides occur irrelevant of socioeconomic class but cars are generally stolen from wealthier neighborhoods.
+
+(!! Note that the color scale does not match in the following plots)
+
+```{r include=FALSE}
+
+# Heat Graphs
+san.fran.long <- mean(rbind(gta.fran, mur.fran)[,long])
+san.fran.lat  <- mean(rbind(gta.fran, mur.fran)[,lat])
+
+san.fran.map <- get_map(location = c(san.fran.long, san.fran.lat), zoom = 12)
+
+raleigh.long <- mean(rbind(gta.ral, mur.ral)[,long])
+raleigh.lat  <- mean(rbind(gta.ral, mur.ral)[,lat])
+
+raleigh.map <- get_map(location = "raleigh", zoom = 11)
+
+```
+
+```{r echo=FALSE, warning=FALSE}
+
+mur.fran.map <- ggmap(san.fran.map, extent = 'device') + 
+  geom_density2d(data = mur.fran, aes(x = long, y = lat)) + 
+  stat_density2d(
+    data = mur.fran, 
+    aes(x = long, y = lat, fill = ..level.., alpha = ..level..), 
+    size = 0.01, 
+    geom = "polygon"
+  ) + scale_fill_gradient(low = "yellow", high = "red") + 
+  scale_alpha(range = c(0, 0.3), guide = FALSE) + 
+  ggtitle("Murder\nSan Francisco")
+
+
+mur.ral.map <- ggmap(raleigh.map, extent = 'device') + 
+  geom_density2d(data = mur.ral, aes(x = long, y = lat), size = 0.3) + 
+  stat_density2d(
+    data = mur.ral, 
+    aes(x = long, y = lat, fill = ..level.., alpha = ..level..), 
+    size = 0.01, 
+    geom = "polygon"
+  ) + scale_fill_gradient(low = "yellow", high = "red") + 
+  scale_alpha(range = c(0, 0.3), guide = FALSE)+ 
+  ggtitle("Murder\nRaleigh")
+
+
+gta.fran.map <- ggmap(san.fran.map, extent = 'device') + 
+  geom_density2d(data = gta.fran, aes(x = long, y = lat), size = 0.3) + 
+  stat_density2d(
+    data = gta.fran, 
+    aes(x = long, y = lat, fill = ..level.., alpha = ..level..), 
+    size = 0.01, 
+    geom = "polygon"
+  ) + scale_fill_gradient(low = "yellow", high = "red") + 
+  scale_alpha(range = c(0, 0.3), guide = FALSE)+ 
+  ggtitle("Auto Theft\nSan Francisco")
+
+
+gta.ral.map <- 
+  ggmap(raleigh.map, extent = 'device') + 
+  geom_density2d(data = gta.ral, aes(x = long, y = lat), size = 0.3) + 
+  stat_density2d(
+    data = gta.ral, 
+    aes(x = long, y = lat, fill = ..level.., alpha = ..level..), 
+    size = 0.01, 
+    geom = "polygon"
+  ) + scale_fill_gradient(low = "yellow", high = "red") + 
+  scale_alpha(range = c(0, 0.3), guide = FALSE)+ 
+  ggtitle("Auto Theft\nRaleigh")
+
+
+grid.arrange(mur.fran.map, mur.ral.map, gta.fran.map, gta.ral.map, ncol = 2)
+
+
+```
+
+\pagebreak
+
+Seeing the frequency of these crimes over time allows us to see a few important trends:
+  - there are large peaks for each crime in different places
+  - both crimes are steadily on the decline in Raleigh with homocide rates reaching remarkably low frequency today
+  - both crimes seem to be stable in San Francisco (although population data may provide more insight)
+  
+
+
+```{r echo=FALSE}
+
+# Frequency over time
+
+mur.fran[, city := 'San Fran']
+mur.ral[, city := 'Raleigh']
+mur.all <- rbind(mur.fran, mur.ral)
+
+gta.fran[, city := 'San Fran']
+gta.ral[, city := 'Raleigh']
+gta.all <- rbind(gta.fran, gta.ral)
+
+gta.dens <- ggplot(gta.all, aes(x = date, color = city)) + geom_density() + ggtitle('Auto Theft') + ylab('Density') + xlab('Date')
+mur.dens <- ggplot(mur.all, aes(x = date, color = city)) + geom_density() + ggtitle('Murder') + ylab('Density') + xlab('Date')
+
+grid.arrange(gta.dens, mur.dens, ncol = 1)
+
+
+```
+
+
